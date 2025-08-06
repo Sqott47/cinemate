@@ -1,0 +1,7 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
