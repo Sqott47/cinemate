@@ -449,6 +449,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
                 </Box>
               )}
             </Box>
+
             <IconButton onClick={() => setDrawerOpen(true)}>
               <MenuIcon />
             </IconButton>
