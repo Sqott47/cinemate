@@ -214,6 +214,10 @@ export default function VideoPlayer({ roomId, username, userId }) {
         document.body.appendChild(audio);
       }
       audio.srcObject = e.streams[0];
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => console.error("Audio play failed", err));
+      }
     };
     return pc;
   };
@@ -373,13 +377,13 @@ export default function VideoPlayer({ roomId, username, userId }) {
             Room: {roomId}
           </Typography>
           <Box>
-            <IconButton
-              onClick={toggleMic}
-              sx={{ mr: 1 }}
-              color={micOn ? "secondary" : "default"}
-            >
-              {micOn ? <MicOffIcon /> : <MicIcon />}
-            </IconButton>
+              <IconButton
+                onClick={toggleMic}
+                sx={{ mr: 1 }}
+                color={micOn ? "secondary" : "default"}
+              >
+                {micOn ? <MicIcon /> : <MicOffIcon />}
+              </IconButton>
             <IconButton onClick={() => setDrawerOpen(true)}>
               <MenuIcon />
             </IconButton>
