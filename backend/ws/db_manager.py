@@ -8,11 +8,13 @@ from datetime import datetime
 from uuid import uuid4
 from contextlib import contextmanager
 import json
+import asyncio
 
 
 class DBConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, Dict[str, WebSocket]] = {}  # room_id -> {user_id: ws}
+        self._broadcast_lock = asyncio.Lock()
 
     @contextmanager
     def get_db(self) -> Session:
@@ -95,12 +97,19 @@ class DBConnectionManager:
         return self.active_connections.get(room_id, {}).get(user_id)
 
     async def broadcast(self, message: str, room_id: str, sender: WebSocket = None):
-        for ws in self.active_connections.get(room_id, {}).values():
-            if sender is None or ws != sender:
-                try:
-                    await ws.send_text(message)
-                except Exception as e:
-                    logger.warning(f"[Broadcast] Failed to send to websocket: {e}")
+        async with self._broadcast_lock:
+            room_connections = self.active_connections.get(room_id, {})
+            to_disconnect = []
+            for user_id, ws in list(room_connections.items()):
+                if sender is None or ws != sender:
+                    try:
+                        await ws.send_text(message)
+                    except Exception as e:
+                        logger.warning(f"[Broadcast] Failed to send to websocket: {e}")
+                        to_disconnect.append((user_id, ws))
+
+            for user_id, ws in to_disconnect:
+                self.disconnect(ws, room_id, user_id)
 
     async def broadcast_users(self, room_id: str):
         with self.get_db() as db:
