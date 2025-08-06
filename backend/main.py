@@ -16,11 +16,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-print("[MAIN] FastAPI init")
+logger.info("[MAIN] FastAPI init")
 
-print("[MAIN] Router imported")
+logger.info("[MAIN] Router imported")
 app.include_router(ws_router)
-print("[MAIN] Router included")
+logger.info("[MAIN] Router included")
 app.include_router(auth.router)
 app.include_router(room_router)
 
