@@ -30,6 +30,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const videoRef = useRef(null);
   const wsRef = useRef(null);
   const isRemoteAction = useRef(false);
+  const wasKickedRef = useRef(false);
 
   const [wsReady, setWsReady] = useState(false);
   const [wasKicked, setWasKicked] = useState(false);
@@ -51,12 +52,13 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
     ws.onopen = () => setWsReady(true);
 
-    ws.onmessage = (event) => {
     ws.onclose = () => {
-      if (!wasKicked) {
+      if (!wasKickedRef.current) {
         console.warn("WebSocket closed without kicked message");
       }
     };
+
+    ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "joined") {
@@ -77,11 +79,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
       if (data.type === "kicked") {
         console.log("Received kicked");
         setWasKicked(true);
+        wasKickedRef.current = true;
         wsRef.current?.close();
         setUsers([]);
         setMyUserId(null);
         return;
-}
+      }
 
 
 
