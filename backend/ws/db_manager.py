@@ -96,6 +96,16 @@ class DBConnectionManager:
     def get_websocket_by_user_id(self, room_id: str, user_id: str) -> WebSocket | None:
         return self.active_connections.get(room_id, {}).get(user_id)
 
+    async def send_to(self, message: str, room_id: str, target_id: str):
+        """Send a message to a specific user in a room."""
+        ws = self.active_connections.get(room_id, {}).get(target_id)
+        if ws:
+            try:
+                await ws.send_text(message)
+            except Exception as e:
+                logger.warning(f"[SendTo] Failed to send to {target_id}: {e}")
+                self.disconnect(ws, room_id, target_id)
+
     async def broadcast(self, message: str, room_id: str, sender: WebSocket = None):
         async with self._broadcast_lock:
             room_connections = self.active_connections.get(room_id, {})

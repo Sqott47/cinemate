@@ -79,6 +79,11 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                     "video_url": video_url,
                 }), room_id)
 
+            elif msg_type in ("voice-offer", "voice-answer", "voice-candidate"):
+                target_id = data.get("target_id")
+                if target_id:
+                    await manager.send_to(json.dumps(data), room_id, target_id)
+
             elif msg_type == "set_permissions":
                 sender_id = data.get("user_id")
                 sender_part = manager.get_participant(room_id, sender_id)

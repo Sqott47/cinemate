@@ -21,6 +21,8 @@ import PeopleIcon from "@mui/icons-material/People";
 import ChatIcon from "@mui/icons-material/Chat";
 import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import CloseIcon from "@mui/icons-material/Close";
+import MicIcon from "@mui/icons-material/Mic";
+import MicOffIcon from "@mui/icons-material/MicOff";
 
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
@@ -44,6 +46,11 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("participants");
 
+  const [micOn, setMicOn] = useState(false);
+  const localStreamRef = useRef(null);
+  const peersRef = useRef({});
+  const audioElementsRef = useRef({});
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -61,7 +68,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
       }
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "joined") {
@@ -89,8 +96,45 @@ export default function VideoPlayer({ roomId, username, userId }) {
         return;
       }
 
+      if (data.type === "voice-offer") {
+        const { user_id: senderId, offer } = data;
+        let pc = peersRef.current[senderId];
+        if (!pc) {
+          pc = createPeerConnection(senderId);
+          peersRef.current[senderId] = pc;
+        }
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
+        }
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        wsRef.current?.send(JSON.stringify({
+          type: "voice-answer",
+          user_id: myUserId,
+          target_id: senderId,
+          answer,
+        }));
+        return;
+      }
 
+      if (data.type === "voice-answer") {
+        const { user_id: senderId, answer } = data;
+        const pc = peersRef.current[senderId];
+        if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+        return;
+      }
 
+      if (data.type === "voice-candidate") {
+        const { user_id: senderId, candidate } = data;
+        const pc = peersRef.current[senderId];
+        if (pc && candidate) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        return;
+      }
 
       if (data.type === "chat") {
         setMessages((prev) => [...prev, data]);
@@ -125,6 +169,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
     return () => {
       ws.close();
+      Object.values(peersRef.current).forEach((pc) => pc.close());
+      Object.values(audioElementsRef.current).forEach((a) => a.remove());
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [roomId, username]);
 
@@ -142,6 +189,112 @@ export default function VideoPlayer({ roomId, username, userId }) {
     console.log("[SEND EVENT]", payload);
     wsRef.current.send(JSON.stringify(payload));
   };
+  const createPeerConnection = (targetId) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        wsRef.current?.send(
+          JSON.stringify({
+            type: "voice-candidate",
+            user_id: myUserId,
+            target_id: targetId,
+            candidate: e.candidate,
+          })
+        );
+      }
+    };
+    pc.ontrack = (e) => {
+      let audio = audioElementsRef.current[targetId];
+      if (!audio) {
+        audio = document.createElement("audio");
+        audio.autoplay = true;
+        audioElementsRef.current[targetId] = audio;
+        document.body.appendChild(audio);
+      }
+      audio.srcObject = e.streams[0];
+    };
+    return pc;
+  };
+
+  const toggleMic = async () => {
+    if (micOn) {
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      Object.values(peersRef.current).forEach((pc) => {
+        pc.getSenders().forEach((sender) => {
+          if (sender.track && sender.track.kind === "audio") {
+            pc.removeTrack(sender);
+          }
+        });
+      });
+      setMicOn(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setMicOn(true);
+        users.forEach(async (u) => {
+          if (u.id === myUserId) return;
+          let pc = peersRef.current[u.id];
+          if (!pc) {
+            pc = createPeerConnection(u.id);
+            peersRef.current[u.id] = pc;
+          }
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          wsRef.current?.send(
+            JSON.stringify({
+              type: "voice-offer",
+              user_id: myUserId,
+              target_id: u.id,
+              offer,
+            })
+          );
+        });
+      } catch (err) {
+        console.error("Mic error", err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!micOn || !localStreamRef.current) return;
+    users.forEach(async (u) => {
+      if (u.id === myUserId) return;
+      if (!peersRef.current[u.id]) {
+        const pc = createPeerConnection(u.id);
+        peersRef.current[u.id] = pc;
+        localStreamRef.current.getTracks().forEach((track) =>
+          pc.addTrack(track, localStreamRef.current)
+        );
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        wsRef.current?.send(
+          JSON.stringify({
+            type: "voice-offer",
+            user_id: myUserId,
+            target_id: u.id,
+            offer,
+          })
+        );
+      }
+    });
+    Object.keys(peersRef.current).forEach((id) => {
+      if (!users.find((u) => u.id === id)) {
+        peersRef.current[id].close();
+        delete peersRef.current[id];
+        const audio = audioElementsRef.current[id];
+        if (audio) {
+          audio.srcObject = null;
+          audio.remove();
+          delete audioElementsRef.current[id];
+        }
+      }
+    });
+  }, [users, micOn]);
 
 
   const setPermission = (targetId, newPermissions) => {
@@ -219,9 +372,18 @@ export default function VideoPlayer({ roomId, username, userId }) {
           <Typography variant="h6" fontWeight={600}>
             Room: {roomId}
           </Typography>
-          <IconButton onClick={() => setDrawerOpen(true)}>
-            <MenuIcon />
-          </IconButton>
+          <Box>
+            <IconButton
+              onClick={toggleMic}
+              sx={{ mr: 1 }}
+              color={micOn ? "secondary" : "default"}
+            >
+              {micOn ? <MicOffIcon /> : <MicIcon />}
+            </IconButton>
+            <IconButton onClick={() => setDrawerOpen(true)}>
+              <MenuIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 
