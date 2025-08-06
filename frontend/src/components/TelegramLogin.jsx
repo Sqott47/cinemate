@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { v4 as uuidv4 } from "uuid"; // npm install uuid
+import { API_BASE_URL } from "../config";
 
 export default function TelegramLogin({ onAuthSuccess }) {
   useEffect(() => {
@@ -14,7 +15,7 @@ export default function TelegramLogin({ onAuthSuccess }) {
     document.getElementById("telegram-login-btn").appendChild(script);
 
     window.onTelegramAuth = (user) => {
-  fetch("http://localhost:8000/auth/telegram", {
+  fetch(`${API_BASE_URL}/auth/telegram`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(user)

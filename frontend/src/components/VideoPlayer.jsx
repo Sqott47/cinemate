@@ -25,6 +25,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
+import { WS_BASE_URL } from "../config";
 
 export default function VideoPlayer({ roomId, username, userId }) {
   const videoRef = useRef(null);
@@ -47,7 +48,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/${roomId}?username=${encodeURIComponent(username)}&user_id=${userId}`);
+    const ws = new WebSocket(
+      `${WS_BASE_URL}/ws/${roomId}?username=${encodeURIComponent(username)}&user_id=${userId}`
+    );
     wsRef.current = ws;
 
     ws.onopen = () => setWsReady(true);
@@ -229,7 +232,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
           canControl={canControl}
           onPlay={() => sendEvent("play")}
           onPause={() => sendEvent("pause")}
-          onSeek={(time) => sendEvent("seek")}
+          onSeek={() => sendEvent("seek")}
           ref={videoRef}
         />
       </Box>
