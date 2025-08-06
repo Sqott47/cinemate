@@ -214,11 +214,16 @@ export default function VideoPlayer({ roomId, username, userId }) {
         document.body.appendChild(audio);
       }
       audio.srcObject = e.streams[0];
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => console.error("Audio play failed", err));
+      }
     };
     return pc;
   };
 
   const toggleMic = async () => {
+    if (!myUserId) return;
     if (micOn) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -237,6 +242,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
         setMicOn(true);
         users.forEach(async (u) => {
           if (u.id === myUserId) return;
+          if (Number(myUserId) > Number(u.id)) return;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -261,15 +267,16 @@ export default function VideoPlayer({ roomId, username, userId }) {
   };
 
   useEffect(() => {
-    if (!micOn || !localStreamRef.current) return;
+    if (!micOn || !localStreamRef.current || !myUserId) return;
     users.forEach(async (u) => {
       if (u.id === myUserId) return;
+      if (Number(myUserId) > Number(u.id)) return;
       if (!peersRef.current[u.id]) {
         const pc = createPeerConnection(u.id);
         peersRef.current[u.id] = pc;
-        localStreamRef.current.getTracks().forEach((track) =>
-          pc.addTrack(track, localStreamRef.current)
-        );
+        localStreamRef.current
+          .getTracks()
+          .forEach((track) => pc.addTrack(track, localStreamRef.current));
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         wsRef.current?.send(
@@ -373,13 +380,13 @@ export default function VideoPlayer({ roomId, username, userId }) {
             Room: {roomId}
           </Typography>
           <Box>
-            <IconButton
-              onClick={toggleMic}
-              sx={{ mr: 1 }}
-              color={micOn ? "secondary" : "default"}
-            >
-              {micOn ? <MicOffIcon /> : <MicIcon />}
-            </IconButton>
+              <IconButton
+                onClick={toggleMic}
+                sx={{ mr: 1 }}
+                color={micOn ? "secondary" : "default"}
+              >
+                {micOn ? <MicIcon /> : <MicOffIcon />}
+              </IconButton>
             <IconButton onClick={() => setDrawerOpen(true)}>
               <MenuIcon />
             </IconButton>
