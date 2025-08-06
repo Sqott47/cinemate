@@ -15,6 +15,7 @@ import {
   useTheme,
   useMediaQuery,
   Button,
+  LinearProgress,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
@@ -50,6 +51,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const localStreamRef = useRef(null);
   const peersRef = useRef({});
   const audioElementsRef = useRef({});
+
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataArrayRef = useRef(null);
+  const animationRef = useRef(null);
+  const [micLevel, setMicLevel] = useState(0);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -172,6 +179,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
       Object.values(peersRef.current).forEach((pc) => pc.close());
       Object.values(audioElementsRef.current).forEach((a) => a.remove());
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      stopMicLevelMonitoring();
     };
   }, [roomId, username]);
 
@@ -188,6 +196,48 @@ export default function VideoPlayer({ roomId, username, userId }) {
     };
     console.log("[SEND EVENT]", payload);
     wsRef.current.send(JSON.stringify(payload));
+  };
+
+  const startMicLevelMonitoring = (stream) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      audioContextRef.current = new AudioCtx();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      const analyser = audioContextRef.current.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+      const update = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteTimeDomainData(dataArrayRef.current);
+        let sum = 0;
+        for (let i = 0; i < dataArrayRef.current.length; i++) {
+          const val = dataArrayRef.current[i] - 128;
+          sum += val * val;
+        }
+        const rms = Math.sqrt(sum / dataArrayRef.current.length) / 128;
+        setMicLevel(rms);
+        animationRef.current = requestAnimationFrame(update);
+      };
+      update();
+    } catch (err) {
+      console.error("Mic level monitoring failed", err);
+    }
+  };
+
+  const stopMicLevelMonitoring = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    analyserRef.current = null;
+    dataArrayRef.current = null;
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setMicLevel(0);
   };
   const createPeerConnection = (targetId) => {
     const pc = new RTCPeerConnection({
@@ -214,14 +264,20 @@ export default function VideoPlayer({ roomId, username, userId }) {
         document.body.appendChild(audio);
       }
       audio.srcObject = e.streams[0];
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => console.error("Audio play failed", err));
+      }
     };
     return pc;
   };
 
   const toggleMic = async () => {
+    if (!myUserId) return;
     if (micOn) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
+      stopMicLevelMonitoring();
       Object.values(peersRef.current).forEach((pc) => {
         pc.getSenders().forEach((sender) => {
           if (sender.track && sender.track.kind === "audio") {
@@ -234,9 +290,11 @@ export default function VideoPlayer({ roomId, username, userId }) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStreamRef.current = stream;
+        startMicLevelMonitoring(stream);
         setMicOn(true);
         users.forEach(async (u) => {
           if (u.id === myUserId) return;
+          if (Number(myUserId) > Number(u.id)) return;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -261,15 +319,16 @@ export default function VideoPlayer({ roomId, username, userId }) {
   };
 
   useEffect(() => {
-    if (!micOn || !localStreamRef.current) return;
+    if (!micOn || !localStreamRef.current || !myUserId) return;
     users.forEach(async (u) => {
       if (u.id === myUserId) return;
+      if (Number(myUserId) > Number(u.id)) return;
       if (!peersRef.current[u.id]) {
         const pc = createPeerConnection(u.id);
         peersRef.current[u.id] = pc;
-        localStreamRef.current.getTracks().forEach((track) =>
-          pc.addTrack(track, localStreamRef.current)
-        );
+        localStreamRef.current
+          .getTracks()
+          .forEach((track) => pc.addTrack(track, localStreamRef.current));
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         wsRef.current?.send(
@@ -372,14 +431,24 @@ export default function VideoPlayer({ roomId, username, userId }) {
           <Typography variant="h6" fontWeight={600}>
             Room: {roomId}
           </Typography>
-          <Box>
-            <IconButton
-              onClick={toggleMic}
-              sx={{ mr: 1 }}
-              color={micOn ? "secondary" : "default"}
-            >
-              {micOn ? <MicOffIcon /> : <MicIcon />}
-            </IconButton>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+              <IconButton
+                onClick={toggleMic}
+                color={micOn ? "secondary" : "default"}
+              >
+                {micOn ? <MicIcon /> : <MicOffIcon />}
+              </IconButton>
+              {micOn && (
+                <Box sx={{ width: 40, ml: 1 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={micLevel * 100}
+                    sx={{ height: 6, borderRadius: 2 }}
+                  />
+                </Box>
+              )}
+            </Box>
             <IconButton onClick={() => setDrawerOpen(true)}>
               <MenuIcon />
             </IconButton>
