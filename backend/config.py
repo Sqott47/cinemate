@@ -8,8 +8,6 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 SQLALCHEMY_DATABASE_URL = "sqlite:///./cinemate.db"
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TELEGRAM_BOT_TOKEN:
-    raise EnvironmentError("TELEGRAM_BOT_TOKEN environment variable is not set")
 
 LOG_FILE = os.path.join(LOG_DIR, "cinemate.log")
 
