@@ -1,11 +1,8 @@
 from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, JSON, Text
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from .database import Base
-
-
-Base = declarative_base()
 
 def generate_uuid():
     return str(uuid.uuid4())
