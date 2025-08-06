@@ -3,4 +3,7 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.10 (cinemate)" />
   </component>
+  <component name="ExtraIDETweaksSettingsProject">
+    <option name="enableOpenEditorsShowRecentFiles" value="false" />
+  </component>
 </project>
