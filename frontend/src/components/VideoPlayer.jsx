@@ -25,11 +25,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
+import { WS_BASE_URL } from "../config";
 
 export default function VideoPlayer({ roomId, username, userId }) {
   const videoRef = useRef(null);
   const wsRef = useRef(null);
   const isRemoteAction = useRef(false);
+  const wasKickedRef = useRef(false);
 
   const [wsReady, setWsReady] = useState(false);
   const [wasKicked, setWasKicked] = useState(false);
@@ -46,17 +48,20 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/${roomId}?username=${encodeURIComponent(username)}&user_id=${userId}`);
+    const ws = new WebSocket(
+      `${WS_BASE_URL}/ws/${roomId}?username=${encodeURIComponent(username)}&user_id=${userId}`
+    );
     wsRef.current = ws;
 
     ws.onopen = () => setWsReady(true);
 
-    ws.onmessage = (event) => {
     ws.onclose = () => {
-      if (!wasKicked) {
+      if (!wasKickedRef.current) {
         console.warn("WebSocket closed without kicked message");
       }
     };
+
+    ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "joined") {
@@ -77,11 +82,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
       if (data.type === "kicked") {
         console.log("Received kicked");
         setWasKicked(true);
+        wasKickedRef.current = true;
         wsRef.current?.close();
         setUsers([]);
         setMyUserId(null);
         return;
-}
+      }
 
 
 
@@ -226,7 +232,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
           canControl={canControl}
           onPlay={() => sendEvent("play")}
           onPause={() => sendEvent("pause")}
-          onSeek={(time) => sendEvent("seek")}
+          onSeek={() => sendEvent("seek")}
           ref={videoRef}
         />
       </Box>

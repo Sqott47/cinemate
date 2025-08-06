@@ -112,9 +112,9 @@ const CustomVideoPlayer = forwardRef(function CustomVideoPlayer(
           backgroundColor: "black",
         }}
       />
-      {canControl && (
-        <>
-          <Stack direction="row" spacing={2} alignItems="center" mt={2}>
+      <Stack direction="row" spacing={2} alignItems="center" mt={2}>
+        {canControl && (
+          <>
             <IconButton onClick={togglePlay} color="primary">
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
@@ -131,26 +131,28 @@ const CustomVideoPlayer = forwardRef(function CustomVideoPlayer(
             <Typography variant="body2" sx={{ minWidth: 80 }}>
               {formatTime(currentTime)} / {formatTime(duration)}
             </Typography>
+          </>
+        )}
 
-            <IconButton onClick={handleFullscreen}>
-              <FullscreenIcon />
-            </IconButton>
-          </Stack>
+        <IconButton onClick={handleFullscreen}>
+          <FullscreenIcon />
+        </IconButton>
+      </Stack>
 
-          <Stack direction="row" spacing={2} alignItems="center" mt={1}>
-            <IconButton onClick={() => handleVolume(null, volume === 0 ? 1 : 0)}>
-              {volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
-            </IconButton>
-            <Slider
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={handleVolume}
-              sx={{ width: 120 }}
-            />
-          </Stack>
-        </>
+      {canControl && (
+        <Stack direction="row" spacing={2} alignItems="center" mt={1}>
+          <IconButton onClick={() => handleVolume(null, volume === 0 ? 1 : 0)}>
+            {volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
+          </IconButton>
+          <Slider
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            onChange={handleVolume}
+            sx={{ width: 120 }}
+          />
+        </Stack>
       )}
     </Box>
   );
