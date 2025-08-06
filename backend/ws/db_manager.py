@@ -134,6 +134,16 @@ class DBConnectionManager:
                 "users": user_list
             }), room_id)
 
+    def set_video(self, room_id: str, video_url: str) -> None:
+        with self.get_db() as db:
+            room = db.query(Room).filter_by(id=room_id).first()
+            if not room:
+                room = Room(id=room_id, current_video_url=video_url)
+                db.add(room)
+            else:
+                room.current_video_url = video_url
+            db.commit()
+
     def set_permissions(self, room_id: str, target_id: str, new_permissions: dict) -> bool:
         with self.get_db() as db:
             participant = db.query(RoomParticipant).filter_by(room_id=room_id, user_id=target_id).first()
