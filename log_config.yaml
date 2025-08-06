@@ -1,0 +1,42 @@
+version: 1
+formatters:
+  default:
+    format: "[%(asctime)s] %(levelname)s - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: default
+
+  file:
+    class: logging.FileHandler
+    level: INFO
+    filename: logs/cinemate.log
+    formatter: default
+
+loggers:
+  uvicorn:
+    handlers: [console, file]
+    level: INFO
+    propagate: no
+
+  uvicorn.error:
+    handlers: [console, file]
+    level: INFO
+    propagate: no
+
+  uvicorn.access:
+    handlers: [console, file]
+    level: INFO
+    propagate: no
+
+  cinemate:
+    handlers: [console, file]
+    level: INFO
+    propagate: no
+
+root:
+  handlers: [console, file]
+  level: INFO
