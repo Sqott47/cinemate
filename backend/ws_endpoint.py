@@ -80,6 +80,15 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                 }), room_id)
 
             elif msg_type == "set_permissions":
+                sender_id = data.get("user_id")
+                sender_part = manager.get_participant(room_id, sender_id)
+                if not sender_part or not sender_part.permissions.get("kick"):
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    logger.warning(
+                        f"[UNAUTHORIZED] User {sender_id} tried to change permissions in room {room_id}"
+                    )
+                    continue
+
                 with manager.get_db() as db:
                     updated = manager.set_permissions(
                         room_id,
@@ -91,6 +100,15 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
                     await manager.broadcast_users(room_id)
 
             elif msg_type == "kick":
+                sender_id = data.get("user_id")
+                sender_part = manager.get_participant(room_id, sender_id)
+                if not sender_part or not sender_part.permissions.get("kick"):
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    logger.warning(
+                        f"[UNAUTHORIZED] User {sender_id} tried to kick in room {room_id}"
+                    )
+                    continue
+
                 target_id = data.get("target_id")
                 kicked = manager.kick_user(room_id=room_id, target_id=target_id)
 
