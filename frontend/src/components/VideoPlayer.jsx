@@ -64,6 +64,10 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const [wasKicked, setWasKicked] = useState(false);
   const [users, setUsers] = useState([]);
   const [myUserId, setMyUserId] = useState(userId || null);
+  const myUserIdRef = useRef(userId || null);
+  useEffect(() => {
+    myUserIdRef.current = myUserId;
+  }, [myUserId]);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [videoUrl, setVideoUrl] = useState("/sample.mp4");
@@ -172,12 +176,14 @@ export default function VideoPlayer({ roomId, username, userId }) {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        wsRef.current?.send(JSON.stringify({
-          type: "voice-answer",
-          user_id: myUserId,
-          target_id: senderId,
-          answer,
-        }));
+        wsRef.current?.send(
+          JSON.stringify({
+            type: "voice-answer",
+            user_id: myUserIdRef.current,
+            target_id: senderId,
+            answer,
+          })
+        );
         return;
       }
 
@@ -239,20 +245,30 @@ export default function VideoPlayer({ roomId, username, userId }) {
     };
   }, [roomId, username]);
 
-  const sendEvent = (type) => {
-    if (!wsReady || !videoRef.current || isRemoteAction.current || !myUserId) {
-      console.log("[SEND BLOCKED]", { wsReady, hasVideo: !!videoRef.current, isRemote: isRemoteAction.current, myUserId });
-      return;
-    }
+    const sendEvent = (type) => {
+      if (
+        !wsReady ||
+        !videoRef.current ||
+        isRemoteAction.current ||
+        !myUserIdRef.current
+      ) {
+        console.log("[SEND BLOCKED]", {
+          wsReady,
+          hasVideo: !!videoRef.current,
+          isRemote: isRemoteAction.current,
+          myUserId: myUserIdRef.current,
+        });
+        return;
+      }
 
-    const payload = {
-      type,
-      user_id: myUserId,
-      timestamp: videoRef.current.currentTime,
+      const payload = {
+        type,
+        user_id: myUserIdRef.current,
+        timestamp: videoRef.current.currentTime,
+      };
+      console.log("[SEND EVENT]", payload);
+      wsRef.current.send(JSON.stringify(payload));
     };
-    console.log("[SEND EVENT]", payload);
-    wsRef.current.send(JSON.stringify(payload));
-  };
 
   const startMicLevelMonitoring = (stream) => {
     try {
@@ -299,18 +315,18 @@ export default function VideoPlayer({ roomId, username, userId }) {
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        wsRef.current?.send(
-          JSON.stringify({
-            type: "voice-candidate",
-            user_id: myUserId,
-            target_id: targetId,
-            candidate: e.candidate,
-          })
-        );
-      }
-    };
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          wsRef.current?.send(
+            JSON.stringify({
+              type: "voice-candidate",
+              user_id: myUserIdRef.current,
+              target_id: targetId,
+              candidate: e.candidate,
+            })
+          );
+        }
+      };
     pc.ontrack = (e) => {
       const stream = e.streams[0];
       setRemoteAudios((prev) => {
@@ -326,9 +342,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
     return pc;
   };
 
-  const toggleMic = async () => {
-    if (!myUserId) return;
-    if (micOn) {
+    const toggleMic = async () => {
+      if (!myUserIdRef.current) return;
+      if (micOn) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       stopMicLevelMonitoring();
@@ -347,7 +363,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
         startMicLevelMonitoring(stream);
         setMicOn(true);
         for (const u of users) {
-          if (u.id === myUserId) continue;
+          if (u.id === myUserIdRef.current) continue;
           // Always add tracks to every peer connection.
           // Compare IDs as strings to deterministically choose which peer
           // should create the offer and avoid negotiation glare.
@@ -357,13 +373,13 @@ export default function VideoPlayer({ roomId, username, userId }) {
             peersRef.current[u.id] = pc;
           }
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-          if (String(myUserId) < String(u.id)) {
+          if (String(myUserIdRef.current) < String(u.id)) {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             wsRef.current?.send(
               JSON.stringify({
                 type: "voice-offer",
-                user_id: myUserId,
+                user_id: myUserIdRef.current,
                 target_id: u.id,
                 offer,
               })
@@ -379,12 +395,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
     }
   };
 
-  useEffect(() => {
-    if (!micOn || !localStreamRef.current || !myUserId) return;
-    const setupPeers = async () => {
-      try {
+    useEffect(() => {
+      if (!micOn || !localStreamRef.current || !myUserIdRef.current) return;
+      const setupPeers = async () => {
+        try {
         for (const u of users) {
-          if (u.id === myUserId) continue;
+          if (u.id === myUserIdRef.current) continue;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -398,13 +414,13 @@ export default function VideoPlayer({ roomId, username, userId }) {
                 pc.addTrack(track, localStreamRef.current);
               }
             });
-          if (String(myUserId) < String(u.id)) {
+          if (String(myUserIdRef.current) < String(u.id)) {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             wsRef.current?.send(
               JSON.stringify({
                 type: "voice-offer",
-                user_id: myUserId,
+                user_id: myUserIdRef.current,
                 target_id: u.id,
                 offer,
               })
@@ -423,7 +439,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
         setRemoteAudios((audios) => audios.filter((a) => a.id !== id));
       }
     });
-  }, [users, micOn]);
+    }, [users, micOn, myUserId]);
 
 
   const setPermission = (targetId, newPermissions) => {
