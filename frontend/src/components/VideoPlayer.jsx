@@ -42,7 +42,11 @@ function RemoteAudio({ stream }) {
       audioRef.current.srcObject = stream;
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
-        playPromise.catch((err) => console.error("Audio play failed", err));
+        playPromise.catch((err) => {
+          if (err.name !== "AbortError") {
+            console.error("Audio play failed", err);
+          }
+        });
       }
     }
   }, [stream]);
@@ -155,7 +159,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
           peersRef.current[senderId] = pc;
         }
         if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
+          const existingSenders = pc.getSenders();
+          localStreamRef.current.getTracks().forEach((track) => {
+            if (!existingSenders.find((s) => s.track === track)) {
+              pc.addTrack(track, localStreamRef.current);
+            }
+          });
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pc.createAnswer();
