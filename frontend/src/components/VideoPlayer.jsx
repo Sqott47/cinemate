@@ -26,6 +26,8 @@ import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import CloseIcon from "@mui/icons-material/Close";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
+import LinkIcon from "@mui/icons-material/Link";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
@@ -79,6 +81,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const roomLink = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
 
   useEffect(() => {
     const ws = new WebSocket(
@@ -523,6 +526,10 @@ export default function VideoPlayer({ roomId, username, userId }) {
               <ListItemIcon><ChatIcon /></ListItemIcon>
               <ListItemText primary="Чат" />
             </ListItemButton>
+            <ListItemButton selected={activeTab === "share"} onClick={() => setActiveTab("share")}>
+              <ListItemIcon><LinkIcon /></ListItemIcon>
+              <ListItemText primary="Скопировать ссылку" />
+            </ListItemButton>
           </List>
 
           {isMobile && (
@@ -580,6 +587,25 @@ export default function VideoPlayer({ roomId, username, userId }) {
                 setInput={setChatInput}
                 onSend={handleSendChat}
               />
+            )}
+            {activeTab === "share" && (
+              <Box>
+                <Typography gutterBottom>Поделитесь ссылкой:</Typography>
+                <TextField
+                  fullWidth
+                  value={roomLink}
+                  InputProps={{ readOnly: true }}
+                  sx={{ mb: 2 }}
+                />
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<ContentCopyIcon />}
+                  onClick={() => navigator.clipboard.writeText(roomLink)}
+                >
+                  Скопировать
+                </Button>
+              </Box>
             )}
           </Box>
         </Box>

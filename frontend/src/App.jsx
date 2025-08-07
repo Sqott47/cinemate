@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ThemeProvider,
   createTheme,
@@ -6,7 +6,6 @@ import {
   Box,
   Paper,
   Typography,
-  TextField,
   Button,
 } from "@mui/material";
 import TelegramLogin from "./components/TelegramLogin";
@@ -32,13 +31,28 @@ const darkTheme = createTheme({
 });
 
 export default function App() {
-  const [roomId, setRoomId] = useState("");
+  const [roomId, setRoomId] = useState(() =>
+    new URLSearchParams(window.location.search).get("room") || ""
+  );
   const [user, setUser] = useState(null);
   const [joined, setJoined] = useState(false);
 
-  const handleJoin = () => {
-    if (roomId.trim() && user) {
+  useEffect(() => {
+    if (user && roomId) {
       setJoined(true);
+    }
+  }, [user, roomId]);
+
+  const createRoom = async () => {
+    try {
+      const resp = await fetch("/api/rooms/create", { method: "POST" });
+      const data = await resp.json();
+      setRoomId(data.room_id);
+      setJoined(true);
+      const newUrl = `${window.location.pathname}?room=${data.room_id}`;
+      window.history.replaceState(null, "", newUrl);
+    } catch (err) {
+      console.error("Failed to create room", err);
     }
   };
 
@@ -79,24 +93,16 @@ export default function App() {
             ) : !joined ? (
               <>
                 <Typography variant="h4" align="center" gutterBottom fontWeight={600}>
-                  Join Room
+                  Создать комнату
                 </Typography>
-                <TextField
-                  fullWidth
-                  label="Room ID"
-                  variant="outlined"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  sx={{ mt: 2 }}
-                />
                 <Button
                   fullWidth
                   variant="contained"
                   size="large"
                   sx={{ mt: 3, fontWeight: 600 }}
-                  onClick={handleJoin}
+                  onClick={createRoom}
                 >
-                  Join
+                  Создать
                 </Button>
               </>
             ) : (
