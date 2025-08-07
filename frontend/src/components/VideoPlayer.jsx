@@ -32,7 +32,12 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
-import { WS_BASE_URL } from "../config";
+import { WS_BASE_URL, API_BASE_URL } from "../config";
+import {
+  connectToRoom,
+  toggleMute as livekitToggleMute,
+  disconnect as livekitDisconnect,
+} from "../services/livekitClient";
 
 function RemoteAudio({ stream }) {
   const audioRef = useRef(null);
@@ -75,9 +80,8 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("participants");
 
-  const [micOn, setMicOn] = useState(false);
-  const localStreamRef = useRef(null);
-  const peersRef = useRef({});
+  const [muted, setMuted] = useState(true);
+  const localTrackRef = useRef(null);
   const [remoteAudios, setRemoteAudios] = useState([]);
 
   const audioContextRef = useRef(null);
@@ -158,53 +162,6 @@ export default function VideoPlayer({ roomId, username, userId }) {
         return;
       }
 
-      if (data.type === "voice-offer") {
-        const { user_id: senderId, offer } = data;
-        let pc = peersRef.current[senderId];
-        if (!pc) {
-          pc = createPeerConnection(senderId);
-          peersRef.current[senderId] = pc;
-        }
-        if (localStreamRef.current) {
-          const existingSenders = pc.getSenders();
-          localStreamRef.current.getTracks().forEach((track) => {
-            if (!existingSenders.find((s) => s.track === track)) {
-              pc.addTrack(track, localStreamRef.current);
-            }
-          });
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        wsRef.current?.send(
-          JSON.stringify({
-            type: "voice-answer",
-            user_id: myUserIdRef.current,
-            target_id: senderId,
-            answer,
-          })
-        );
-        return;
-      }
-
-      if (data.type === "voice-answer") {
-        const { user_id: senderId, answer } = data;
-        const pc = peersRef.current[senderId];
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        }
-        return;
-      }
-
-      if (data.type === "voice-candidate") {
-        const { user_id: senderId, candidate } = data;
-        const pc = peersRef.current[senderId];
-        if (pc && candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-        return;
-      }
-
       if (data.type === "chat") {
         setMessages((prev) => [...prev, data]);
         return;
@@ -238,12 +195,11 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
     return () => {
       ws.close();
-      Object.values(peersRef.current).forEach((pc) => pc.close());
+      livekitDisconnect();
       setRemoteAudios([]);
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
       stopMicLevelMonitoring();
     };
-  }, [roomId, username]);
+  }, [roomId, username, userId]);
 
     const sendEvent = (type) => {
       if (
@@ -311,135 +267,55 @@ export default function VideoPlayer({ roomId, username, userId }) {
     }
     setMicLevel(0);
   };
-  const createPeerConnection = (targetId) => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-      pc.onicecandidate = (e) => {
-        if (e.candidate) {
-          wsRef.current?.send(
-            JSON.stringify({
-              type: "voice-candidate",
-              user_id: myUserIdRef.current,
-              target_id: targetId,
-              candidate: e.candidate,
-            })
-          );
-        }
-      };
-    pc.ontrack = (e) => {
-      const stream = e.streams[0];
-      setRemoteAudios((prev) => {
-        const exists = prev.find((a) => a.id === targetId);
-        if (exists) {
-          return prev.map((a) =>
-            a.id === targetId ? { id: targetId, stream } : a
-          );
-        }
-        return [...prev, { id: targetId, stream }];
-      });
-    };
-    return pc;
-  };
-
-    const toggleMic = async () => {
-      if (!myUserIdRef.current) return;
-      if (micOn) {
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-      stopMicLevelMonitoring();
-      Object.values(peersRef.current).forEach((pc) => {
-        pc.getSenders().forEach((sender) => {
-          if (sender.track && sender.track.kind === "audio") {
-            pc.removeTrack(sender);
-          }
-        });
-      });
-      setMicOn(false);
-    } else {
+  const toggleMic = async () => {
+    if (!myUserIdRef.current) return;
+    if (!localTrackRef.current) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStreamRef.current = stream;
-        startMicLevelMonitoring(stream);
-        setMicOn(true);
-        for (const u of users) {
-          if (u.id === myUserIdRef.current) continue;
-          // Always add tracks to every peer connection.
-          // Compare IDs as strings to deterministically choose which peer
-          // should create the offer and avoid negotiation glare.
-          let pc = peersRef.current[u.id];
-          if (!pc) {
-            pc = createPeerConnection(u.id);
-            peersRef.current[u.id] = pc;
-          }
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-          if (String(myUserIdRef.current) < String(u.id)) {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            wsRef.current?.send(
-              JSON.stringify({
-                type: "voice-offer",
-                user_id: myUserIdRef.current,
-                target_id: u.id,
-                offer,
-              })
-            );
-          }
-        }
+        const res = await fetch(`${API_BASE_URL}/livekit/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: myUserIdRef.current,
+            room_id: roomId,
+          }),
+        });
+        const { token, url } = await res.json();
+        const track = await connectToRoom(url, token, {
+          onTrackSubscribed: (id, stream) => {
+            setRemoteAudios((prev) => {
+              const exists = prev.find((a) => a.id === id);
+              if (exists) {
+                return prev.map((a) => (a.id === id ? { id, stream } : a));
+              }
+              return [...prev, { id, stream }];
+            });
+          },
+          onTrackUnsubscribed: (id) => {
+            setRemoteAudios((prev) => prev.filter((a) => a.id !== id));
+          },
+        });
+        localTrackRef.current = track;
+        startMicLevelMonitoring(new MediaStream([track.mediaStreamTrack]));
+        setMuted(false);
       } catch (err) {
         console.error("Mic error", err);
         setMicError(
           "Unable to access microphone. Please check permissions or device availability."
         );
       }
+    } else {
+      const isMuted = await livekitToggleMute();
+      setMuted(isMuted);
+      if (isMuted) {
+        stopMicLevelMonitoring();
+      } else if (localTrackRef.current) {
+        startMicLevelMonitoring(
+          new MediaStream([localTrackRef.current.mediaStreamTrack])
+        );
+      }
     }
   };
 
-    useEffect(() => {
-      if (!micOn || !localStreamRef.current || !myUserIdRef.current) return;
-      const setupPeers = async () => {
-        try {
-        for (const u of users) {
-          if (u.id === myUserIdRef.current) continue;
-          let pc = peersRef.current[u.id];
-          if (!pc) {
-            pc = createPeerConnection(u.id);
-            peersRef.current[u.id] = pc;
-          }
-          const existingSenders = pc.getSenders();
-          localStreamRef.current
-            .getTracks()
-            .forEach((track) => {
-              if (!existingSenders.find((s) => s.track === track)) {
-                pc.addTrack(track, localStreamRef.current);
-              }
-            });
-          if (String(myUserIdRef.current) < String(u.id)) {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            wsRef.current?.send(
-              JSON.stringify({
-                type: "voice-offer",
-                user_id: myUserIdRef.current,
-                target_id: u.id,
-                offer,
-              })
-            );
-          }
-        }
-      } catch (err) {
-        console.error("Peer setup error", err);
-      }
-    };
-    setupPeers();
-    Object.keys(peersRef.current).forEach((id) => {
-      if (!users.find((u) => u.id === id)) {
-        peersRef.current[id].close();
-        delete peersRef.current[id];
-        setRemoteAudios((audios) => audios.filter((a) => a.id !== id));
-      }
-    });
-    }, [users, micOn, myUserId]);
 
 
   const setPermission = (targetId, newPermissions) => {
@@ -524,11 +400,11 @@ export default function VideoPlayer({ roomId, username, userId }) {
             <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
               <IconButton
                 onClick={toggleMic}
-                color={micOn ? "secondary" : "default"}
+                color={!muted ? "secondary" : "default"}
               >
-                {micOn ? <MicIcon /> : <MicOffIcon />}
+                {!muted ? <MicIcon /> : <MicOffIcon />}
               </IconButton>
-              {micOn && (
+              {!muted && (
                 <Box sx={{ width: 40, ml: 1 }}>
                   <LinearProgress
                     variant="determinate"
