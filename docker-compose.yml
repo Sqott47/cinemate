@@ -1,21 +1,30 @@
-version: "3.8"
+version: "3.9"  # version >= 3.8 даёт больше возможностей
 
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    container_name: cinemate-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend  # Автообновление кода без пересборки
+      - ./cinemate.db:/app/cinemate.db  # Подключение локальной БД внутрь контейнера
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
-      LIVEKIT_URL: ${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=devsecret
+      - LIVEKIT_URL=ws://livekit:7880
+      - USE_LIVEKIT=true
     depends_on:
       - livekit
+
   livekit:
-    image: livekit/livekit-server
+    image: livekit/livekit-server:latest
+    container_name: livekit
     ports:
-      - "7880:7880"
-    command: >
-      --dev
-      --no-tls
-      --api-key ${LIVEKIT_API_KEY}
-      --api-secret ${LIVEKIT_API_SECRET}
+      - "7880:7880"        # WebSocket API
+      - "7881:7881/udp"    # UDP media
+    command: --dev
+    environment:
+      -LIVEKIT_KEYS=devkey: devsecret

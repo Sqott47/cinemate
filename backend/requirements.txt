@@ -5,3 +5,4 @@ pydantic
 sqlalchemy
 httpx
 prometheus-client
+websockets
