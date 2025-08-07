@@ -78,6 +78,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const animationRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
   const [micError, setMicError] = useState("");
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -87,6 +88,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard
         .writeText(roomLink)
+        .then(() => setCopySuccess(true))
         .catch((err) => console.error("Clipboard write failed", err));
     } else {
       const textArea = document.createElement("textarea");
@@ -98,6 +100,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
       textArea.select();
       try {
         document.execCommand("copy");
+        setCopySuccess(true);
       } catch (err) {
         console.error("execCommand copy failed", err);
       }
@@ -632,6 +635,19 @@ export default function VideoPlayer({ roomId, username, userId }) {
           </Box>
         </Box>
       </Drawer>
+      <Snackbar
+        open={copySuccess}
+        autoHideDuration={3000}
+        onClose={() => setCopySuccess(false)}
+      >
+        <Alert
+          onClose={() => setCopySuccess(false)}
+          severity="success"
+          sx={{ width: "100%" }}
+        >
+          Ссылка успешно скопирована
+        </Alert>
+      </Snackbar>
       <Snackbar
         open={!!micError}
         autoHideDuration={6000}
