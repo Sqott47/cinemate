@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ThemeProvider,
   createTheme,
@@ -6,11 +6,11 @@ import {
   Box,
   Paper,
   Typography,
-  TextField,
   Button,
 } from "@mui/material";
 import TelegramLogin from "./components/TelegramLogin";
 import VideoPlayer from "./components/VideoPlayer";
+import { API_BASE_URL } from "./config";
 
 const darkTheme = createTheme({
   palette: {
@@ -32,15 +32,35 @@ const darkTheme = createTheme({
 });
 
 export default function App() {
-  const [roomId, setRoomId] = useState("");
+  const [roomId, setRoomId] = useState(() =>
+    new URLSearchParams(window.location.search).get("room") || ""
+  );
   const [user, setUser] = useState(null);
   const [joined, setJoined] = useState(false);
 
-  const handleJoin = () => {
-    if (roomId.trim() && user) {
-      setJoined(true);
+  const createRoom = async () => {
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/rooms/create`, {
+        method: "POST",
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      setRoomId(data.room_id);
+      const newUrl =
+        data.room_url || `${window.location.pathname}?room=${data.room_id}`;
+      window.history.replaceState(null, "", newUrl);
+    } catch (err) {
+      console.error("Failed to create room", err);
     }
   };
+
+  useEffect(() => {
+    if (user && roomId) {
+      setJoined(true);
+    }
+  }, [user, roomId]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -77,28 +97,9 @@ export default function App() {
                 <TelegramLogin onAuthSuccess={setUser} />
               </>
             ) : !joined ? (
-              <>
-                <Typography variant="h4" align="center" gutterBottom fontWeight={600}>
-                  Join Room
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="Room ID"
-                  variant="outlined"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  sx={{ mt: 2 }}
-                />
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  sx={{ mt: 3, fontWeight: 600 }}
-                  onClick={handleJoin}
-                >
-                  Join
-                </Button>
-              </>
+              <Button variant="contained" fullWidth onClick={createRoom}>
+                Создать комнату
+              </Button>
             ) : (
               <VideoPlayer roomId={roomId} username={user.name} userId={user.id} />
             )}

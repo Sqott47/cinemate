@@ -13,7 +13,7 @@ def create_room(db: Session = Depends(get_db)):
     """Create a new room and persist it to the database."""
 
     room = crud.create_room(db)
-    return {"room_id": room.id}
+    return {"room_id": room.id, "room_url": f"/?room={room.id}"}
 
 
 @router.get("/{room_id}")
