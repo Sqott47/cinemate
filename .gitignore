@@ -1,0 +1,18 @@
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Python cache
+__pycache__/
+backend/**/__pycache__/
+**/*.pyc
+
+# Logs and database
+logs/
+*.log
+cinemate.db
+
+# Test caches
+.tests_cache/
+tests/__pycache__/
+

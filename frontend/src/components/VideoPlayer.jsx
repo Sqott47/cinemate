@@ -311,7 +311,12 @@ export default function VideoPlayer({ roomId, username, userId }) {
         setMicOn(true);
         for (const u of users) {
           if (u.id === myUserId) continue;
-          if (Number(myUserId) > Number(u.id)) continue;
+          // Ensure consistent ordering for peer connection initiation.
+          // User IDs are UUID strings, so numeric comparison fails (NaN),
+          // resulting in both peers trying to create offers simultaneously.
+          // Use string comparison instead to deterministically choose one
+          // initiator per pair and avoid negotiation glare.
+          if (String(myUserId) > String(u.id)) continue;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -344,7 +349,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
       try {
         for (const u of users) {
           if (u.id === myUserId) continue;
-          if (Number(myUserId) > Number(u.id)) continue;
+          // Same ordering logic as in toggleMic: compare IDs as strings
+          // to decide which peer should create the offer.
+          if (String(myUserId) > String(u.id)) continue;
           if (!peersRef.current[u.id]) {
             const pc = createPeerConnection(u.id);
             peersRef.current[u.id] = pc;
