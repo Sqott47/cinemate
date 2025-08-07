@@ -311,7 +311,8 @@ export default function VideoPlayer({ roomId, username, userId }) {
           },
         });
         localTrackRef.current = track;
-        startMicLevelMonitoring(new MediaStream([track.mediaStreamTrack]));
+        const mediaStreamTrack = track.mediaStreamTrack || track;
+        startMicLevelMonitoring(new MediaStream([mediaStreamTrack]));
         setMuted(false);
       } catch (err) {
         console.error("Mic error", err);
@@ -325,9 +326,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
       if (isMuted) {
         stopMicLevelMonitoring();
       } else if (localTrackRef.current) {
-        startMicLevelMonitoring(
-          new MediaStream([localTrackRef.current.mediaStreamTrack])
-        );
+        const mediaStreamTrack =
+          localTrackRef.current.mediaStreamTrack || localTrackRef.current;
+        startMicLevelMonitoring(new MediaStream([mediaStreamTrack]));
       }
     }
   };
