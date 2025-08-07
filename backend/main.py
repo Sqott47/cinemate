@@ -6,6 +6,7 @@ from backend.config import logger  # ← обязательно инициали
 from backend.routes import auth
 from backend.routers.livekit import router as livekit_router
 from backend.routers.config_router import router as config_router
+from backend.livekit.metrics_collector import start_collector
 
 logger.info("🚀 Cinemate API starting...")
 
@@ -27,6 +28,11 @@ app.include_router(auth.router)
 app.include_router(room_router)
 app.include_router(livekit_router)
 app.include_router(config_router)
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    start_collector()
 
 @app.get("/")
 async def root():
