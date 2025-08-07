@@ -8,6 +8,9 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 SQLALCHEMY_DATABASE_URL = "sqlite:///./cinemate.db"
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
+LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
+LIVEKIT_URL = os.getenv("LIVEKIT_URL")
 
 LOG_FILE = os.path.join(LOG_DIR, "cinemate.log")
 

@@ -5,3 +5,17 @@ services:
     build: ./backend
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_URL: ${LIVEKIT_URL}
+    depends_on:
+      - livekit
+  livekit:
+    image: livekit/livekit-server
+    ports:
+      - "7880:7880"
+    command: >
+      --dev
+      --no-tls
+      --api-key ${LIVEKIT_API_KEY}
+      --api-secret ${LIVEKIT_API_SECRET}
