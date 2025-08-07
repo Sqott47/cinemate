@@ -6,9 +6,11 @@ import {
   Box,
   Paper,
   Typography,
+  Button,
 } from "@mui/material";
 import TelegramLogin from "./components/TelegramLogin";
 import VideoPlayer from "./components/VideoPlayer";
+import { API_BASE_URL } from "./config";
 
 const darkTheme = createTheme({
   palette: {
@@ -38,21 +40,21 @@ export default function App() {
 
   const createRoom = async () => {
     try {
-      const resp = await fetch("/api/rooms/create", { method: "POST" });
+      const resp = await fetch(`${API_BASE_URL}/api/rooms/create`, {
+        method: "POST",
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
       const data = await resp.json();
       setRoomId(data.room_id);
-      const newUrl = data.room_url || `${window.location.pathname}?room=${data.room_id}`;
+      const newUrl =
+        data.room_url || `${window.location.pathname}?room=${data.room_id}`;
       window.history.replaceState(null, "", newUrl);
     } catch (err) {
       console.error("Failed to create room", err);
     }
   };
-
-  useEffect(() => {
-    if (user && !roomId) {
-      createRoom();
-    }
-  }, [user, roomId]);
 
   useEffect(() => {
     if (user && roomId) {
@@ -95,9 +97,9 @@ export default function App() {
                 <TelegramLogin onAuthSuccess={setUser} />
               </>
             ) : !joined ? (
-              <Typography variant="h5" align="center" fontWeight={600}>
-                Создание комнаты...
-              </Typography>
+              <Button variant="contained" fullWidth onClick={createRoom}>
+                Создать комнату
+              </Button>
             ) : (
               <VideoPlayer roomId={roomId} username={user.name} userId={user.id} />
             )}
