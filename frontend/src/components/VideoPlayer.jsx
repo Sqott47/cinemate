@@ -33,11 +33,7 @@ import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
 import { WS_BASE_URL, API_BASE_URL } from "../config";
-import {
-  connectToRoom,
-  toggleMute as livekitToggleMute,
-  disconnect as livekitDisconnect,
-} from "../services/livekitClient";
+import voiceService from "../services/voiceService";
 
 function RemoteAudio({ stream }) {
   const audioRef = useRef(null);
@@ -195,7 +191,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
     return () => {
       ws.close();
-      livekitDisconnect();
+      voiceService.disconnect();
       setRemoteAudios([]);
       stopMicLevelMonitoring();
     };
@@ -280,7 +276,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
           }),
         });
         const { token, url } = await res.json();
-        const track = await connectToRoom(url, token, {
+        const track = await voiceService.connect(url, token, {
           onTrackSubscribed: (id, stream) => {
             setRemoteAudios((prev) => {
               const exists = prev.find((a) => a.id === id);
@@ -304,7 +300,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
         );
       }
     } else {
-      const isMuted = await livekitToggleMute();
+      const isMuted = await voiceService.toggleMute();
       setMuted(isMuted);
       if (isMuted) {
         stopMicLevelMonitoring();
