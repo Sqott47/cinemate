@@ -294,7 +294,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
         setMicOn(true);
         users.forEach(async (u) => {
           if (u.id === myUserId) return;
-          if (Number(myUserId) > Number(u.id)) return;
+          if (String(myUserId).localeCompare(String(u.id)) > 0) return;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -322,7 +322,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
     if (!micOn || !localStreamRef.current || !myUserId) return;
     users.forEach(async (u) => {
       if (u.id === myUserId) return;
-      if (Number(myUserId) > Number(u.id)) return;
+      if (String(myUserId).localeCompare(String(u.id)) > 0) return;
       if (!peersRef.current[u.id]) {
         const pc = createPeerConnection(u.id);
         peersRef.current[u.id] = pc;
