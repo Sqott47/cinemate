@@ -46,6 +46,21 @@ def test_generate_token_success(monkeypatch):
     assert payload['video']['room'] == 'room1'
 
 
+def test_generate_token_rewrites_livekit_host(monkeypatch):
+    monkeypatch.setenv('LIVEKIT_API_KEY', 'test_key')
+    monkeypatch.setenv('LIVEKIT_API_SECRET', 'test_secret')
+    monkeypatch.setenv('LIVEKIT_URL', 'ws://livekit:7880')
+
+    _reload_backend()
+    from backend.main import app
+    client = TestClient(app)
+
+    resp = client.post('/livekit/token', json={'user_id': 'u1', 'room_id': 'room1'})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['url'] == 'ws://testserver:7880'
+
+
 def test_generate_token_unknown_role(monkeypatch):
     monkeypatch.setenv('LIVEKIT_API_KEY', 'test_key')
     monkeypatch.setenv('LIVEKIT_API_SECRET', 'test_secret')
