@@ -97,7 +97,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
     async function loadConfig() {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/config?user_id=${userId || ""}`
+          `${API_BASE_URL}/config?room_id=${roomId || ""}`
         );
         const data = await res.json();
         setUseLivekit(data.use_livekit);
@@ -106,7 +106,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
       }
     }
     loadConfig();
-  }, [userId]);
+  }, [roomId]);
 
   useEffect(() => {
     voiceService.useLegacy = !useLivekit;
