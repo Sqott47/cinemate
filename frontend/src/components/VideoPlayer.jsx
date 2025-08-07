@@ -32,6 +32,22 @@ import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
 import { WS_BASE_URL } from "../config";
 
+function RemoteAudio({ stream }) {
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.srcObject = stream;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => console.error("Audio play failed", err));
+      }
+    }
+  }, [stream]);
+
+  return <audio ref={audioRef} autoPlay style={{ display: "none" }} />;
+}
+
 export default function VideoPlayer({ roomId, username, userId }) {
   const videoRef = useRef(null);
   const wsRef = useRef(null);
@@ -52,7 +68,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const [micOn, setMicOn] = useState(false);
   const localStreamRef = useRef(null);
   const peersRef = useRef({});
-  const audioElementsRef = useRef({});
+  const [remoteAudios, setRemoteAudios] = useState([]);
 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -180,7 +196,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
     return () => {
       ws.close();
       Object.values(peersRef.current).forEach((pc) => pc.close());
-      Object.values(audioElementsRef.current).forEach((a) => a.remove());
+      setRemoteAudios([]);
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       stopMicLevelMonitoring();
     };
@@ -259,18 +275,16 @@ export default function VideoPlayer({ roomId, username, userId }) {
       }
     };
     pc.ontrack = (e) => {
-      let audio = audioElementsRef.current[targetId];
-      if (!audio) {
-        audio = document.createElement("audio");
-        audio.autoplay = true;
-        audioElementsRef.current[targetId] = audio;
-        document.body.appendChild(audio);
-      }
-      audio.srcObject = e.streams[0];
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => console.error("Audio play failed", err));
-      }
+      const stream = e.streams[0];
+      setRemoteAudios((prev) => {
+        const exists = prev.find((a) => a.id === targetId);
+        if (exists) {
+          return prev.map((a) =>
+            a.id === targetId ? { id: targetId, stream } : a
+          );
+        }
+        return [...prev, { id: targetId, stream }];
+      });
     };
     return pc;
   };
@@ -351,12 +365,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
       if (!users.find((u) => u.id === id)) {
         peersRef.current[id].close();
         delete peersRef.current[id];
-        const audio = audioElementsRef.current[id];
-        if (audio) {
-          audio.srcObject = null;
-          audio.remove();
-          delete audioElementsRef.current[id];
-        }
+        setRemoteAudios((audios) => audios.filter((a) => a.id !== id));
       }
     });
   }, [users, micOn]);
@@ -431,6 +440,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
   return (
 
     <>
+      {remoteAudios.map(({ id, stream }) => (
+        <RemoteAudio key={id} stream={stream} />
+      ))}
       {/* Header */}
       <AppBar position="static" color="transparent" elevation={0}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
