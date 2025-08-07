@@ -20,7 +20,9 @@ def test_create_and_get_room():
     # Create a new room
     resp = client.post("/api/rooms/create")
     assert resp.status_code == 200
-    room_id = resp.json()["room_id"]
+    data = resp.json()
+    room_id = data["room_id"]
+    assert data["room_url"] == f"/?room={room_id}"
 
     # Retrieve the same room
     resp = client.get(f"/api/rooms/{room_id}")
