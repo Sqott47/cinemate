@@ -83,6 +83,28 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const roomLink = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
 
+  const handleCopyLink = () => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard
+        .writeText(roomLink)
+        .catch((err) => console.error("Clipboard write failed", err));
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = roomLink;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand("copy");
+      } catch (err) {
+        console.error("execCommand copy failed", err);
+      }
+      textArea.remove();
+    }
+  };
+
   useEffect(() => {
     const ws = new WebSocket(
       `${WS_BASE_URL}/ws/${roomId}?username=${encodeURIComponent(username)}&user_id=${userId}`
@@ -601,7 +623,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
                   variant="contained"
                   fullWidth
                   startIcon={<ContentCopyIcon />}
-                  onClick={() => navigator.clipboard.writeText(roomLink)}
+                  onClick={handleCopyLink}
                 >
                   Скопировать
                 </Button>
