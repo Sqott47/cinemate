@@ -32,7 +32,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CustomVideoPlayer from "./CustomVideoPlayer";
 import ChatBox from "./ChatBox";
 import ParticipantsList from "./ParticipantsList";
-import { WS_BASE_URL, API_BASE_URL } from "../config";
+import { WS_BASE_URL, API_BASE_URL, USE_LIVEKIT } from "../config";
 import voiceService from "../services/voiceService";
 
 function RemoteAudio({ stream }) {
@@ -79,6 +79,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const [muted, setMuted] = useState(true);
   const localTrackRef = useRef(null);
   const [remoteAudios, setRemoteAudios] = useState([]);
+  const [useLivekit, setUseLivekit] = useState(USE_LIVEKIT);
 
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -91,6 +92,25 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const roomLink = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/config?user_id=${userId || ""}`
+        );
+        const data = await res.json();
+        setUseLivekit(data.use_livekit);
+      } catch (err) {
+        console.error("Failed to load config", err);
+      }
+    }
+    loadConfig();
+  }, [userId]);
+
+  useEffect(() => {
+    voiceService.useLegacy = !useLivekit;
+  }, [useLivekit]);
 
   const handleCopyLink = () => {
     if (navigator.clipboard && window.isSecureContext) {
