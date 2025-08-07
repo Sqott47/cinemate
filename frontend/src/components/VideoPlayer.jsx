@@ -16,6 +16,8 @@ import {
   useMediaQuery,
   Button,
   LinearProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
@@ -57,6 +59,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
   const dataArrayRef = useRef(null);
   const animationRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
+  const [micError, setMicError] = useState("");
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -314,6 +317,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
         });
       } catch (err) {
         console.error("Mic error", err);
+        setMicError(
+          "Unable to access microphone. Please check permissions or device availability."
+        );
       }
     }
   };
@@ -552,6 +558,19 @@ export default function VideoPlayer({ roomId, username, userId }) {
           </Box>
         </Box>
       </Drawer>
+      <Snackbar
+        open={!!micError}
+        autoHideDuration={6000}
+        onClose={() => setMicError("")}
+      >
+        <Alert
+          onClose={() => setMicError("")}
+          severity="error"
+          sx={{ width: "100%" }}
+        >
+          {micError}
+        </Alert>
+      </Snackbar>
     </>
   );
 }
