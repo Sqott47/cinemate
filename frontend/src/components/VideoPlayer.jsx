@@ -309,9 +309,9 @@ export default function VideoPlayer({ roomId, username, userId }) {
         localStreamRef.current = stream;
         startMicLevelMonitoring(stream);
         setMicOn(true);
-        users.forEach(async (u) => {
-          if (u.id === myUserId) return;
-          if (String(myUserId).localeCompare(String(u.id)) > 0) return;
+        for (const u of users) {
+          if (u.id === myUserId) continue;
+          if (Number(myUserId) > Number(u.id)) continue;
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
@@ -328,7 +328,7 @@ export default function VideoPlayer({ roomId, username, userId }) {
               offer,
             })
           );
-        });
+        }
       } catch (err) {
         console.error("Mic error", err);
         setMicError(
@@ -340,27 +340,34 @@ export default function VideoPlayer({ roomId, username, userId }) {
 
   useEffect(() => {
     if (!micOn || !localStreamRef.current || !myUserId) return;
-    users.forEach(async (u) => {
-      if (u.id === myUserId) return;
-      if (String(myUserId).localeCompare(String(u.id)) > 0) return;
-      if (!peersRef.current[u.id]) {
-        const pc = createPeerConnection(u.id);
-        peersRef.current[u.id] = pc;
-        localStreamRef.current
-          .getTracks()
-          .forEach((track) => pc.addTrack(track, localStreamRef.current));
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        wsRef.current?.send(
-          JSON.stringify({
-            type: "voice-offer",
-            user_id: myUserId,
-            target_id: u.id,
-            offer,
-          })
-        );
+    const setupPeers = async () => {
+      try {
+        for (const u of users) {
+          if (u.id === myUserId) continue;
+          if (Number(myUserId) > Number(u.id)) continue;
+          if (!peersRef.current[u.id]) {
+            const pc = createPeerConnection(u.id);
+            peersRef.current[u.id] = pc;
+            localStreamRef.current
+              .getTracks()
+              .forEach((track) => pc.addTrack(track, localStreamRef.current));
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            wsRef.current?.send(
+              JSON.stringify({
+                type: "voice-offer",
+                user_id: myUserId,
+                target_id: u.id,
+                offer,
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Peer setup error", err);
       }
-    });
+    };
+    setupPeers();
     Object.keys(peersRef.current).forEach((id) => {
       if (!users.find((u) => u.id === id)) {
         peersRef.current[id].close();
