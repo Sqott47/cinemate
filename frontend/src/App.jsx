@@ -6,7 +6,6 @@ import {
   Box,
   Paper,
   Typography,
-  Button,
 } from "@mui/material";
 import TelegramLogin from "./components/TelegramLogin";
 import VideoPlayer from "./components/VideoPlayer";
@@ -37,24 +36,29 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [joined, setJoined] = useState(false);
 
-  useEffect(() => {
-    if (user && roomId) {
-      setJoined(true);
-    }
-  }, [user, roomId]);
-
   const createRoom = async () => {
     try {
       const resp = await fetch("/api/rooms/create", { method: "POST" });
       const data = await resp.json();
       setRoomId(data.room_id);
-      setJoined(true);
-      const newUrl = `${window.location.pathname}?room=${data.room_id}`;
+      const newUrl = data.room_url || `${window.location.pathname}?room=${data.room_id}`;
       window.history.replaceState(null, "", newUrl);
     } catch (err) {
       console.error("Failed to create room", err);
     }
   };
+
+  useEffect(() => {
+    if (user && !roomId) {
+      createRoom();
+    }
+  }, [user, roomId]);
+
+  useEffect(() => {
+    if (user && roomId) {
+      setJoined(true);
+    }
+  }, [user, roomId]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -91,20 +95,9 @@ export default function App() {
                 <TelegramLogin onAuthSuccess={setUser} />
               </>
             ) : !joined ? (
-              <>
-                <Typography variant="h4" align="center" gutterBottom fontWeight={600}>
-                  Создать комнату
-                </Typography>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  sx={{ mt: 3, fontWeight: 600 }}
-                  onClick={createRoom}
-                >
-                  Создать
-                </Button>
-              </>
+              <Typography variant="h5" align="center" fontWeight={600}>
+                Создание комнаты...
+              </Typography>
             ) : (
               <VideoPlayer roomId={roomId} username={user.name} userId={user.id} />
             )}
