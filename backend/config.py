@@ -11,6 +11,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
+USE_LIVEKIT = os.getenv("USE_LIVEKIT", "false").lower() == "true"
 
 LOG_FILE = os.path.join(LOG_DIR, "cinemate.log")
 
