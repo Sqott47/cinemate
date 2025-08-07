@@ -348,28 +348,27 @@ export default function VideoPlayer({ roomId, username, userId }) {
         setMicOn(true);
         for (const u of users) {
           if (u.id === myUserId) continue;
-          // Ensure consistent ordering for peer connection initiation.
-          // User IDs are UUID strings, so numeric comparison fails (NaN),
-          // resulting in both peers trying to create offers simultaneously.
-          // Use string comparison instead to deterministically choose one
-          // initiator per pair and avoid negotiation glare.
-          if (String(myUserId) > String(u.id)) continue;
+          // Always add tracks to every peer connection.
+          // Compare IDs as strings to deterministically choose which peer
+          // should create the offer and avoid negotiation glare.
           let pc = peersRef.current[u.id];
           if (!pc) {
             pc = createPeerConnection(u.id);
             peersRef.current[u.id] = pc;
           }
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          wsRef.current?.send(
-            JSON.stringify({
-              type: "voice-offer",
-              user_id: myUserId,
-              target_id: u.id,
-              offer,
-            })
-          );
+          if (String(myUserId) < String(u.id)) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            wsRef.current?.send(
+              JSON.stringify({
+                type: "voice-offer",
+                user_id: myUserId,
+                target_id: u.id,
+                offer,
+              })
+            );
+          }
         }
       } catch (err) {
         console.error("Mic error", err);
@@ -386,15 +385,20 @@ export default function VideoPlayer({ roomId, username, userId }) {
       try {
         for (const u of users) {
           if (u.id === myUserId) continue;
-          // Same ordering logic as in toggleMic: compare IDs as strings
-          // to decide which peer should create the offer.
-          if (String(myUserId) > String(u.id)) continue;
-          if (!peersRef.current[u.id]) {
-            const pc = createPeerConnection(u.id);
+          let pc = peersRef.current[u.id];
+          if (!pc) {
+            pc = createPeerConnection(u.id);
             peersRef.current[u.id] = pc;
-            localStreamRef.current
-              .getTracks()
-              .forEach((track) => pc.addTrack(track, localStreamRef.current));
+          }
+          const existingSenders = pc.getSenders();
+          localStreamRef.current
+            .getTracks()
+            .forEach((track) => {
+              if (!existingSenders.find((s) => s.track === track)) {
+                pc.addTrack(track, localStreamRef.current);
+              }
+            });
+          if (String(myUserId) < String(u.id)) {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             wsRef.current?.send(
